@@ -1,0 +1,108 @@
+- Mesa de Dinero opera:
+	- Renta Fija local e internacional (bonos, depósitos a plazo, PDBCs del BCCh)
+		- PDBC: un pagaré a descuento. O sea X monto que se paga en F fecha (son en CLP). Ejemplo 1.000 MM CLP pagaderos el 31-07-2023. Si la tasa de descuento es 12%, entonces uno paga 1.000 / (1+12% x dias_al_vencimiento / 360). Esta es una estructura habitual en money markets.
+	- Forwards FX:
+		- USDCLP, EURUSD, USDJPY (USD vs monedas duras), también se hace CLP vs monedas duras (EURCLP, JPYCLP, ...)
+	- Forwards de Inflación (forwards CLFCLP o UF peso)
+	- Swaps:
+		- Swap cámara promedio (ICPCLP). Este es mayoritariamente un producto interbancario. Fija vs ICPCLP, 6M, bullet.
+		- Podrían haber en cartera swaps de Libor, el más común es Libor3MUSD vs Fija
+		- Swaps fija vs SOFR
+		- Cross currency swaps:
+			- SOFR vs Cámara promedio + spread (el estándar en el mercado USDCLP)
+			- UF Fija vs USD Fija
+			- CLP fija vs USD Fija
+			- UF fija vs CLP fija
+		- **NOTA:** en los swaps con clientes uno va a observar muchas estructuras no plain vanilla en cuanto a periodicidades y amortizaciones. Los swaps que se operan entre bancos son siempre bullet y con periodicidades estándar (6M, 3M, 1Y).
+	- Opciones FX:
+		- Calls y Puts plain vanilla (la gran mayoría vence por compensación). Por ejemplo para una Call USD Put CLP que vence en T con un strike K; al vencimiento el comprador de la opción recibirá max(Obs(T) - K, 0), donde Obs(T) es el dólar observado de T. Esto difiere de una opción por entrega física, cuyo payoff al vencimiento es max(S(t,T) - K, 0), donde S(t, T) es el precio de mercado en T a la hora t. En este caso el comprador debe decidir si ejerce o no la opción en función de S(t, T). Pasado T la opción expira.
+		- Podrían operarse otros pares de divisas: EURUSD, quizás algo Latam.
+	- Opciones de tasa de interés:
+		- Dudo que haya.
+	- Forward Bonds dudo que haya. Estos son sólo sobre BCU o BCP de punta (5Y o 10Y) y vencen en la fecha de la última UF conocida.
+- ¿Cómo se calcula el resultado diario de una posición en un instrumento financiero como los de arriba?
+	- Supongamos que queremos calcular entre t y t+1.
+	- Para fijar las ideas supongamos que la posición es en acciones. 100 acciones de IBM.
+	- Partamos desde la fecha de compra, sea esa t0. Sea PC = 130.00 el precio de compra de las 100 acciones.
+	- En t0 pago PC x 100 USD y recibo 100 acciones de IBM.
+	- Al cierre de t0 el precio de la acción es P0.
+	- ¿Cuál es mi resultado en t0? Veamos mis activos y pasivos.
+		- Pasivo: -PC x 100
+		- Activo (valorizado): P0 x 100
+		- Valor(t0): 100 x [P0 - PC]
+	- Digresión:
+		- Trading <---> Balance o Gestión Financiera (Trading se financia con GF y le pasa  fondos a GF). GF es la encargada de fondear al banco en todas las divisas y de establecer los precios de transferencia de esos fondos (es como el costo de los insumos en una empresa de sector real).
+	- ¿Cuál es mi resultado en t1? Supongo que no he vendido.
+		- Activo: 100 x P1 (donde P1 es el precio de cierre de IBM en t1).
+		- Pasivo: -(PC x 100 + cost_of_carry(t0, t1))
+		- Valor(t1): 100 x P1 -(PC x 100 + cost_of_carry(t0, t1))
+		- Resultado entre t0 y t1:
+			- Valor(t1) - Valor(t0)
+	- ¿Cuál es mi resultado en t2? Supongo que no he vendido.
+		- Activo: 100 x P2 (donde P2 es el precio de cierre de IBM en t2).
+		- Pasivo: -(PC x 100 + cost_of_carry(t0, t2))
+		- Valor(t2): 100 x P2 -(PC x 100 + cost_of_carry(t0, t2))
+			- Carry: MontoInicial x (1 + r(t0, t1) x yf(t0, t1)) x (1 + r(t1, t2) x yf(t1, t2)). Donde yf típicamente es (t2 - t1) / 360
+		- Resultado entre t1 y t2:
+			- Valor(t2) - Valor(t1)
+	- ¿Cuál es mi resultado en t3? Supongo que no he vendido, pero la acción pagó un dividendo de 1 USD por acción.
+		- Activo: 100 x P3 (donde P3 es el precio de cierre de IBM en t3). Pero además, recibí 1 USD por acción, o sea tengo 100 USD en caja.
+		- Pasivo: -(PC x 100 + cost_of_carry(t0, t3))
+		- Valor(t3): 100 x P3 + 100 -(PC x 100 + cost_of_carry(t0, t3))
+		- Resultado entre t2 y t3:
+			- Valor(t3) - Valor(t2)
+	- ¿Cuál es mi resultado en t4? Supongo que no he vendido.
+		- Activo: 100 x P4 (donde P4 es el precio de cierre de IBM en t4).
+		- Activo 2 (dividendo + carry): 100 + profit_of_carry(t3, t4)
+		- Pasivo: -(PC x 100 + cost_of_carry(t0, t4))
+		- Valor(t3): 100 x P4 + 100 -(PC x 100 + cost_of_carry(t0, t4)) + 100 + profit_of_carry(t3, t4)
+		- Resultado entre t3 y t4:
+			- Valor(t4) - Valor(t3)
+	- ¿Cuál es mi resultado en t5? Vendo en t5
+		- PV = 102
+		- Activo: 0
+		- Caja por la venta: 100 x PV 
+		- Pasivo: -(PC x 100 + cost_of_carry(t0, t5))
+		- Carry positivo (dividendo): 100 + profit_of_carry(t3, t5)
+		- Valor(t5): 100 x PV - (PC x 100 + cost_of_carry(t0, t5)) + 100 + profit_of_carry(t3, t5)
+		- Resultado entre t5 y t4:
+			- Valor(t5) - Valor(t4)
+	- Resultados que hemos reportado: Valor(t0) + Valor(t1) - Valor(t0) + Valor(t2) - Valor(t1) + Valor(t3) - Valor(t2) + Valor(t4) - Valor(t3) + Valor(t5) - Valor(t4) = Valor(t5)
+
+
+- Flash con un fwd. Compré 1 MM USD a 800 y el Observado fue 810, me gané 10 MM CLP
+	- Compre en t0: m2m(t0)
+	- En t1: m2m(t1) --> Resultado: m2m(t1) - m2m(t0)
+	- En t2: m2m(t2) --> Resultado: m2m(t2) - m2m(t1)
+	- En t3 vence: m2m( t3) = 0, pero ingreso por vencimiento 10 MM CLP ---> Resultado: m2m(t3) - m2m(t2) + 10
+	- Si haces la suma diario
+		-  m2m(t0) + m2m(t1) - m2m(t0) + m2m(t2) - m2m(t1) + m2m(t3) - m2m(t2) + 10
+- Digresión de forwards:
+	- Típicamente, para los productos con riesgo FX, se pide separar el resultado en las N componentes (que suelen ser FX y tipos de interés, para las opciones tienes FX, tipos de interés y volatilidad).
+	- m2m(t1) - m2m(t0) = Kfx x (FX(t1) - FX(t0)) + Ktasa x (Tasa(t1) - Tasa(t0)) (+ epsilon)
+- A mi me tinca que BCI estima el resultado por sensibilidad.
+
+- BTP0450326:
+	- 28-02-2023, tir = 6,5, VP = 9.710.932
+		- Dur = 2,77. La Tir de mercado en Bolsa es Comp Act/365, ergo tenemos que calcular la Dm para poder aproximar por sensibilidad. Dm = 2,77 / (1 + ,065) = 2,60 (valor a 01-03-2023 bis)
+	- 01-03-2023, tir = 6,5, VP = 9.487.610
+		- Resultado del 01-03-2023: VP1 - VP28 + cupón = 9.487.610 - 9.710.932 + 225.000 = -223.322 + 225.000 = 1.678
+	- 01-03-2023 bis, tir = 6,52, entonces aproximando por duración el resultado sería -Dm x VP(28-02-2023) x ,0002 = -2,60 x 9.710.932 x ,0002 = -5.050 . **OJO:** Dm = derivada / VP
+	- VP al 6,52: 9.482.550 + 225.000 = 9.707.550 ---> Resultado: -3.382
+	- Este mismo efecto se da por pata (flujos + de la pata activa y flujo negativo de la pata pasiva) en los swaps (IRS y CCS, cualqujier tipo de swap de tasa de interés y moneda)
+	- Con los BTP (y cualquier instrumento que corte cupones o pague dividendos) se debe considerar carry (monto de compra y de los cupones).
+- PnL explained:
+	- V = V(x, y) es el valor de un instrumento
+	- V(x + dx, y + dy) - V(x, y) = Vx . dx + Vy . dy (+ epsilon)
+	- Nos comimos el tiempo. En realidad
+		- V = V(x(t), y(t), t)
+		- La derivada respecto a t, Vt generalmente no se considera.
+	- Taylor funciona para dx y dy "pequeños". Cuando hay movimientos grandes la aproximación se echa a perder. Dicho de manera más oscura, en esos casos habría que considerar además la convexidad.
+	- Cómo se hace el "explained" sin recurrir a Taylor.
+		- Consideremos x(1), y(1), t=1
+		- Efecto tiempo: V(x(0), y(0), 1) - V(x(0), y(0), 0)
+		- Efecto x: V(x(1), y(0), 1) - V(x(0), y(0), 1)
+		- Efecto y: V(x(1), y(1), 1)  - V(x(1), y(0), 1) 
+		- Efacto tiempo + Efecto x + Efecto y = V(x(1), y(1), 1)  - V(x(0), y(0), 0) 
+		- Ventajas: es exacto y no dejas nada afuera
+		- Desventaja: caro de calcular y no es conmutativo (depende de la derivada cruzada por ejemplo entre x e y)
